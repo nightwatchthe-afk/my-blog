@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getArticles, getCategories } from '../services/db';
 import { Article, Category } from '../types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { format } from 'date-fns';
 import { Music } from 'lucide-react';
 import { motion } from 'motion/react';
