@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Outlet } from 'react-router-dom';
 import { useAuthStore } from './store';
-import { Button } from './components/ui/button';
+import { Button } from './components/ui/button.tsx';
 import { LogIn, LogOut, PenTool, LayoutDashboard, Home } from 'lucide-react';
-import { Toaster } from './components/ui/sonner';
+import { Toaster } from './components/ui/sonner.tsx';
 import { toast } from 'sonner';
 
 // Pages
