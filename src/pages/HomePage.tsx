@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getArticles, getCategories } from '../services/db';
 import { Article, Category } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.tsx';
 import { format } from 'date-fns';
-import { Music } from 'lucide-react';
+import { Music, Disc3 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function HomePage() {
@@ -13,6 +13,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [siteConfig, setSiteConfig] = useState({ homeBgmUrl: '', homeBgImageUrl: '' });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -31,6 +33,48 @@ export default function HomePage() {
       .then(data => setSiteConfig(data))
       .catch(err => console.error('Failed to load site config:', err));
   }, []);
+
+  // Handle autoplay policy and global click-to-play
+  useEffect(() => {
+    if (siteConfig.homeBgmUrl && audioRef.current) {
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setIsPlaying(true);
+        }).catch(() => {
+          console.log("Autoplay prevented by browser. Waiting for user interaction.");
+          setIsPlaying(false);
+        });
+      }
+    }
+  }, [siteConfig.homeBgmUrl]);
+
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      if (audioRef.current && !isPlaying && siteConfig.homeBgmUrl) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(e => console.error("Playback failed:", e));
+      }
+      document.removeEventListener('click', handleFirstInteraction);
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    return () => document.removeEventListener('click', handleFirstInteraction);
+  }, [isPlaying, siteConfig.homeBgmUrl]);
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+      }
+    }
+  };
 
   const filteredArticles = selectedCategory 
     ? articles.filter(a => a.categoryId === selectedCategory)
@@ -82,7 +126,24 @@ export default function HomePage() {
 
       {/* Hidden Auto-play BGM */}
       {siteConfig.homeBgmUrl && (
-        <audio src={siteConfig.homeBgmUrl} autoPlay loop className="hidden" />
+        <>
+          <audio ref={audioRef} src={siteConfig.homeBgmUrl} loop className="hidden" />
+          
+          {/* Floating Music Control */}
+          <div className="fixed bottom-8 right-8 z-50">
+            <button
+              onClick={togglePlay}
+              className={`flex items-center justify-center w-12 h-12 rounded-full shadow-2xl backdrop-blur-md border transition-all duration-500 hover:scale-110 ${
+                isPlaying 
+                  ? 'bg-orange-500/80 border-orange-400 text-white animate-[spin_4s_linear_infinite]' 
+                  : 'bg-white/80 border-stone-200 text-stone-500 hover:bg-white'
+              }`}
+              title={isPlaying ? "暂停背景音乐" : "播放背景音乐"}
+            >
+              <Disc3 className="w-6 h-6" />
+            </button>
+          </div>
+        </>
       )}
 
       <div className="flex flex-col lg:flex-row gap-12">
