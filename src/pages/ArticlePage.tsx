@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ArrowLeft, Music, Volume2, VolumeX } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 
 export default function ArticlePage() {
   const { id } = useParams<{ id: string }>();
