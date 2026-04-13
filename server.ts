@@ -3,9 +3,17 @@ import { createServer as createViteServer } from 'vite';
 import mysql from 'mysql2/promise';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { v2 as cloudinary } from 'cloudinary';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 async function startServer() {
   const app = express();
@@ -54,35 +62,22 @@ async function startServer() {
   app.post('/api/upload', async (req, res) => {
     try {
       const { data } = req.body;
-      const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       
-      if (!matches || matches.length !== 3) {
-        return res.status(400).json({ error: 'Invalid image data' });
+      if (!data) {
+        return res.status(400).json({ error: 'No image data provided' });
       }
+
+      // Upload directly to Cloudinary
+      // Cloudinary accepts base64 data URIs directly
+      const uploadResponse = await cloudinary.uploader.upload(data, {
+        folder: 'blog_images',
+        resource_type: 'auto'
+      });
       
-      const mimeType = matches[1];
-      const imageBuffer = Buffer.from(matches[2], 'base64');
-      
-      let ext = 'jpg';
-      if (mimeType.includes('png')) ext = 'png';
-      else if (mimeType.includes('gif')) ext = 'gif';
-      else if (mimeType.includes('webp')) ext = 'webp';
-      
-      const id = Math.random().toString(36).substring(2, 15);
-      const filename = `${id}.${ext}`;
-      
-      const fs = await import('fs');
-      const uploadDir = path.join(__dirname, 'public', 'imageback');
-      
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      
-      fs.writeFileSync(path.join(uploadDir, filename), imageBuffer);
-      
-      res.json({ url: `/imageback/${filename}` });
+      res.json({ url: uploadResponse.secure_url });
     } catch (err) {
-      res.status(500).json({ error: String(err) });
+      console.error('Cloudinary upload error:', err);
+      res.status(500).json({ error: 'Failed to upload image to Cloudinary' });
     }
   });
 
