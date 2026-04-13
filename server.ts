@@ -44,13 +44,6 @@ async function startServer() {
         authorId VARCHAR(255) NOT NULL
       )
     `);
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS images (
-        id VARCHAR(36) PRIMARY KEY,
-        data LONGTEXT NOT NULL,
-        createdAt BIGINT NOT NULL
-      )
-    `);
     connection.release();
     console.log('MySQL connected and tables initialized.');
   } catch (err) {
@@ -59,44 +52,37 @@ async function startServer() {
 
   // API Routes
   app.post('/api/upload', async (req, res) => {
-    if (!pool) return res.status(500).json({ error: 'Database not configured' });
     try {
       const { data } = req.body;
-      const id = Math.random().toString(36).substring(2, 15);
-      await pool.query(
-        'INSERT INTO images (id, data, createdAt) VALUES (?, ?, ?)',
-        [id, data, Date.now()]
-      );
-      res.json({ url: `/api/images/${id}` });
-    } catch (err) {
-      res.status(500).json({ error: String(err) });
-    }
-  });
-
-  app.get('/api/images/:id', async (req, res) => {
-    if (!pool) return res.status(500).json({ error: 'Database not configured' });
-    try {
-      const [rows]: any = await pool.query('SELECT data FROM images WHERE id = ?', [req.params.id]);
-      if (rows.length === 0) return res.status(404).send('Not found');
-      
-      const base64Data = rows[0].data;
-      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       
       if (!matches || matches.length !== 3) {
-        return res.status(400).send('Invalid image data');
+        return res.status(400).json({ error: 'Invalid image data' });
       }
       
       const mimeType = matches[1];
       const imageBuffer = Buffer.from(matches[2], 'base64');
       
-      res.writeHead(200, {
-        'Content-Type': mimeType,
-        'Content-Length': imageBuffer.length,
-        'Cache-Control': 'public, max-age=31536000'
-      });
-      res.end(imageBuffer);
+      let ext = 'jpg';
+      if (mimeType.includes('png')) ext = 'png';
+      else if (mimeType.includes('gif')) ext = 'gif';
+      else if (mimeType.includes('webp')) ext = 'webp';
+      
+      const id = Math.random().toString(36).substring(2, 15);
+      const filename = `${id}.${ext}`;
+      
+      const fs = await import('fs');
+      const uploadDir = path.join(__dirname, 'public', 'imageback');
+      
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      fs.writeFileSync(path.join(uploadDir, filename), imageBuffer);
+      
+      res.json({ url: `/imageback/${filename}` });
     } catch (err) {
-      res.status(500).send(String(err));
+      res.status(500).json({ error: String(err) });
     }
   });
 
@@ -199,6 +185,22 @@ async function startServer() {
       res.status(500).json({ error: String(err) });
     }
   });
+
+  // Explicit route for downloading the source code zip
+  app.get('/download-source', (req, res) => {
+    const zipPath = path.join(__dirname, 'public', 'my-blog-source.zip');
+    res.download(zipPath, 'my-blog-source.zip', (err) => {
+      if (err) {
+        console.error('Error downloading file:', err);
+        if (!res.headersSent) {
+          res.status(404).send('File not found or error downloading.');
+        }
+      }
+    });
+  });
+
+  // Serve public/imageback explicitly so runtime uploads are available in production
+  app.use('/imageback', express.static(path.join(__dirname, 'public', 'imageback')));
 
   // Vite middleware for development
   const fs = await import('fs');
